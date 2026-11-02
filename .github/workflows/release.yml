@@ -1,0 +1,28 @@
+name: Release
+
+# Publier une version : `git tag v1.0.1 && git push origin v1.0.1`
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain Rust
+        run: rustup toolchain install stable --profile minimal && rustup default stable
+      - name: Compilation optimisée
+        run: cargo build --release --locked
+      - name: Publication de VideoCut.exe
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          Copy-Item target/release/videocut.exe VideoCut.exe
+          $hash = (Get-FileHash VideoCut.exe -Algorithm SHA256).Hash.ToLower()
+          "$hash  VideoCut.exe" | Out-File -Encoding ascii VideoCut.exe.sha256
+          gh release create $env:GITHUB_REF_NAME VideoCut.exe VideoCut.exe.sha256 --title "VideoCut $env:GITHUB_REF_NAME" --generate-notes
