@@ -87,7 +87,7 @@ impl VideoCutApp {
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 let enabled = ready && self.export.is_none();
                 let button = ui.add_enabled_ui(enabled, |ui| {
-                    icon_button(ui, self.icons.export.as_ref(), 48.0, 58.0, "Exporter", BG)
+                    icon_button(ui, self.icons.export.as_ref(), 48.0, 58.0, "Exporter", Some(BG))
                 });
                 if button.inner.on_hover_text("Ctrl+S").clicked() {
                     self.export_clip(ctx);

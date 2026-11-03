@@ -12,7 +12,7 @@ impl VideoCutApp {
             |ui| {
                 ui.set_height(74.0);
                 ui.horizontal_centered(|ui| {
-                    let select = icon_button(ui, self.icons.select.as_ref(), 64.0, 72.0, "Ouvrir", BUTTON_BG)
+                    let select = icon_button(ui, self.icons.select.as_ref(), 64.0, 72.0, "Ouvrir", Some(BUTTON_BG))
                         .on_hover_text("Choisir un fichier audio ou vidéo (Ctrl+O), ou le glisser dans la fenêtre");
                     if select.clicked() {
                         self.choose_file(ctx);
@@ -34,7 +34,7 @@ impl VideoCutApp {
                     });
                     ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                         for (link, icon) in LINKS.iter().zip(&self.icons.links).rev() {
-                            let response = icon_button(ui, icon.as_ref(), 32.0, 38.0, link.fallback, PANEL)
+                            let response = icon_button(ui, icon.as_ref(), 32.0, 38.0, link.fallback, None)
                                 .on_hover_text(link.label);
                             if response.clicked() {
                                 ctx.open_url(egui::OpenUrl::new_tab(link.url));
