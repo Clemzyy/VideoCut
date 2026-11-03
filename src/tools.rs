@@ -24,7 +24,7 @@ pub struct Tools {
 }
 
 impl Tools {
-    pub fn describe(&self) -> String {
+    pub(crate) fn describe(&self) -> String {
         match &self.origin {
             ToolOrigin::Managed(version) => format!("FFmpeg {version}"),
             ToolOrigin::Custom => "FFmpeg (choisi à la main)".into(),
@@ -40,7 +40,7 @@ pub fn exe_name(base: &str) -> String {
 }
 
 /// Dossier racine des versions de FFmpeg gérées par VideoCut.
-pub fn managed_root(data_dir: &Path) -> PathBuf {
+pub(crate) fn managed_root(data_dir: &Path) -> PathBuf {
     data_dir.join("ffmpeg")
 }
 

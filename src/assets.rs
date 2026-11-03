@@ -11,13 +11,13 @@ const YOUTUBE_PNG: &[u8] = include_bytes!("../assets/social_youtube_32.png");
 const SITE_PNG: &[u8] = include_bytes!("../assets/social_pc32_32.png");
 const PAYPAL_PNG: &[u8] = include_bytes!("../assets/social_paypal_32.png");
 
-pub struct Link {
+pub(crate) struct Link {
     pub label: &'static str,
     pub fallback: &'static str,
     pub url: &'static str,
 }
 
-pub const LINKS: [Link; 4] = [
+pub(crate) const LINKS: [Link; 4] = [
     Link { label: "TikTok Clemzy", fallback: "TikTok", url: "https://www.tiktok.com/@__clemzy__" },
     Link { label: "YouTube Clemzy", fallback: "YouTube", url: "https://www.youtube.com/@Clemzy" },
     Link { label: "Site internet pc32.fr", fallback: "pc32", url: "https://www.pc32.fr/" },
@@ -28,7 +28,7 @@ pub const LINKS: [Link; 4] = [
     },
 ];
 
-pub struct Icons {
+pub(crate) struct Icons {
     pub select: Option<TextureHandle>,
     pub export: Option<TextureHandle>,
     /// Dans l'ordre de [`LINKS`].
@@ -36,7 +36,7 @@ pub struct Icons {
 }
 
 impl Icons {
-    pub fn load(ctx: &Context) -> Self {
+    pub(crate) fn load(ctx: &Context) -> Self {
         let texture = |name: &str, bytes: &[u8]| {
             decode_png(bytes).map(|image| ctx.load_texture(name, image, TextureOptions::LINEAR))
         };
@@ -53,7 +53,7 @@ impl Icons {
     }
 }
 
-pub fn decode_png(bytes: &[u8]) -> Option<ColorImage> {
+pub(crate) fn decode_png(bytes: &[u8]) -> Option<ColorImage> {
     let image = image::load_from_memory_with_format(bytes, image::ImageFormat::Png).ok()?.to_rgba8();
     let size = [image.width() as usize, image.height() as usize];
     Some(ColorImage::from_rgba_unmultiplied(size, image.as_raw()))

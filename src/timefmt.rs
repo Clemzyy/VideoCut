@@ -4,7 +4,7 @@
 ///
 /// L'arrondi se fait sur les millisecondes entières, si bien que 59,9996 s
 /// donne `01:00.000` et jamais `00:60.000`.
-pub fn format_time(seconds: f64) -> String {
+pub(crate) fn format_time(seconds: f64) -> String {
     let total_ms = if seconds.is_finite() && seconds > 0.0 { (seconds * 1000.0).round() as u64 } else { 0 };
     let ms = total_ms % 1000;
     let total_s = total_ms / 1000;
@@ -16,7 +16,7 @@ pub fn format_time(seconds: f64) -> String {
 
 /// Analyse une saisie utilisateur : `SS`, `MM:SS` ou `HH:MM:SS`, avec
 /// décimales optionnelles (point ou virgule).
-pub fn parse_time(text: &str) -> Result<f64, String> {
+pub(crate) fn parse_time(text: &str) -> Result<f64, String> {
     let text = text.trim().replace(',', ".");
     if text.is_empty() {
         return Err("Saisis une heure, par exemple 01:23.500.".into());

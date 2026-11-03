@@ -11,13 +11,13 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 /// Fréquence d'échantillonnage utilisée pour la forme d'onde.
-pub const ANALYSIS_RATE: u32 = 16_000;
+pub(crate) const ANALYSIS_RATE: u32 = 16_000;
 /// Nombre maximal de cases au niveau le plus fin (environ 16 Mo de pics).
 const MAX_BASE_BINS: f64 = 4_000_000.0;
 /// Une case fait au minimum 1 ms à 16 kHz.
 const MIN_SAMPLES_PER_BIN: u32 = 16;
 const PROBE_TIMEOUT: Duration = Duration::from_secs(30);
-pub const CANCELLED: &str = "Analyse annulée.";
+pub(crate) const CANCELLED: &str = "Analyse annulée.";
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct VideoStream {
@@ -39,7 +39,7 @@ impl MediaInfo {
         self.audio_index.is_some()
     }
 
-    pub fn is_video(&self) -> bool {
+    pub(crate) fn is_video(&self) -> bool {
         self.video.is_some()
     }
 }
@@ -112,7 +112,7 @@ struct ProbeFormat {
     duration: Option<String>,
 }
 
-pub fn parse_ffprobe_json(text: &str) -> Result<MediaInfo, String> {
+pub(crate) fn parse_ffprobe_json(text: &str) -> Result<MediaInfo, String> {
     let json: ProbeJson = serde_json::from_str(text).map_err(|err| format!("Réponse de ffprobe illisible : {err}"))?;
     let mut info = MediaInfo {
         duration: json
@@ -149,7 +149,7 @@ pub fn parse_ffprobe_json(text: &str) -> Result<MediaInfo, String> {
 }
 
 /// Convertit `30000/1001` ou `25` en images par seconde.
-pub fn parse_rate(value: &str) -> Option<f64> {
+pub(crate) fn parse_rate(value: &str) -> Option<f64> {
     let value = value.trim();
     let rate = match value.split_once('/') {
         Some((num, den)) => {
@@ -165,7 +165,7 @@ pub fn parse_rate(value: &str) -> Option<f64> {
 }
 
 /// Repli quand ffprobe est absent : analyse de la bannière de `ffmpeg -i`.
-pub fn parse_ffmpeg_banner(text: &str) -> MediaInfo {
+pub(crate) fn parse_ffmpeg_banner(text: &str) -> MediaInfo {
     let mut info = MediaInfo::default();
     for line in text.lines() {
         let line = line.trim();
@@ -229,7 +229,7 @@ pub struct Peaks {
 }
 
 impl Peaks {
-    pub fn from_base(base: Vec<[i16; 2]>, samples_per_bin: u32, sample_rate: u32, total_samples: u64) -> Self {
+    pub(crate) fn from_base(base: Vec<[i16; 2]>, samples_per_bin: u32, sample_rate: u32, total_samples: u64) -> Self {
         let mut levels = vec![if base.is_empty() { vec![[0, 0]] } else { base }];
         while levels.last().is_some_and(|level| level.len() > 1) {
             let previous = levels.last().expect("niveau présent");
@@ -267,21 +267,17 @@ impl Peaks {
             bins[first..last].iter().fold([i16::MAX, i16::MIN], |acc, p| [acc[0].min(p[0]), acc[1].max(p[1])]);
         Some((f32::from(min) / 32768.0, f32::from(max) / 32768.0))
     }
-
-    pub fn memory_bytes(&self) -> usize {
-        self.levels.iter().map(|l| l.len() * 4).sum()
-    }
 }
 
 /// Taille de case adaptée à la durée pour plafonner la mémoire.
-pub fn samples_per_bin_for(duration: Option<f64>) -> u32 {
+pub(crate) fn samples_per_bin_for(duration: Option<f64>) -> u32 {
     let total = duration.unwrap_or(0.0).max(0.0) * f64::from(ANALYSIS_RATE);
     let needed = (total / MAX_BASE_BINS).ceil();
     (needed.min(f64::from(u32::MAX)) as u32).max(MIN_SAMPLES_PER_BIN)
 }
 
 /// Accumulateur en flux continu : aucun échantillon brut n'est conservé.
-pub struct PeakBuilder {
+pub(crate) struct PeakBuilder {
     samples_per_bin: u32,
     count: u32,
     current: [i16; 2],
@@ -303,7 +299,7 @@ impl PeakBuilder {
     }
 
     /// Ajoute des octets PCM s16le, même découpés au milieu d'un échantillon.
-    pub fn push_bytes(&mut self, mut bytes: &[u8]) {
+    pub(crate) fn push_bytes(&mut self, mut bytes: &[u8]) {
         if let Some(low) = self.pending_byte.take() {
             let Some((&high, rest)) = bytes.split_first() else {
                 self.pending_byte = Some(low);
@@ -333,11 +329,11 @@ impl PeakBuilder {
         }
     }
 
-    pub fn total_samples(&self) -> u64 {
+    pub(crate) fn total_samples(&self) -> u64 {
         self.total_samples
     }
 
-    pub fn finish(mut self, sample_rate: u32) -> Peaks {
+    pub(crate) fn finish(mut self, sample_rate: u32) -> Peaks {
         if self.count > 0 {
             self.base.push(self.current);
         }
@@ -533,6 +529,5 @@ mod tests {
         let peaks = PeakBuilder::new(16).finish(ANALYSIS_RATE);
         assert_eq!(peaks.duration(), 0.0);
         assert_eq!(peaks.range(0.0, 0.0005), Some((0.0, 0.0)));
-        assert!(peaks.memory_bytes() > 0);
     }
 }

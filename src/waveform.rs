@@ -10,9 +10,9 @@ use egui::{
 };
 
 /// Écart minimal entre Début et Fin, en secondes.
-pub const MIN_SELECTION: f64 = 0.02;
+pub(crate) const MIN_SELECTION: f64 = 0.02;
 /// Plage visible minimale au zoom maximal, en secondes.
-pub const MIN_SPAN: f64 = 0.05;
+pub(crate) const MIN_SPAN: f64 = 0.05;
 const GRAB_DISTANCE: f32 = 18.0;
 const ZOOM_IN_STEP: f64 = 0.82;
 
@@ -23,19 +23,19 @@ const WAVE: Color32 = Color32::from_rgb(0x57, 0xc7, 0xff);
 const DIM: Color32 = Color32::from_rgba_premultiplied(3, 4, 5, 150);
 const SELECTION_OUTLINE: Color32 = Color32::from_rgb(0xdc, 0xec, 0xff);
 const MARKER_SHADOW: Color32 = Color32::from_rgb(0x0b, 0x10, 0x14);
-pub const START_COLOR: Color32 = Color32::from_rgb(0x2e, 0xe5, 0x9d);
-pub const END_COLOR: Color32 = Color32::from_rgb(0xff, 0xb4, 0x54);
+pub(crate) const START_COLOR: Color32 = Color32::from_rgb(0x2e, 0xe5, 0x9d);
+pub(crate) const END_COLOR: Color32 = Color32::from_rgb(0xff, 0xb4, 0x54);
 const LABEL: Color32 = Color32::from_rgb(0xc9, 0xd4, 0xdd);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Marker {
+pub(crate) enum Marker {
     Start,
     End,
     Playhead,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum WaveEvent {
+pub(crate) enum WaveEvent {
     DragStarted(Marker),
     Moved(Marker, f64),
     DragFinished(Marker),
@@ -45,7 +45,7 @@ pub enum WaveEvent {
 
 /// Actions du menu contextuel ; l'heure est celle de l'endroit cliqué.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum MenuAction {
+pub(crate) enum MenuAction {
     SetStart(f64),
     SetEnd(f64),
     PlayFrom(f64),
@@ -53,7 +53,7 @@ pub enum MenuAction {
 }
 
 #[derive(Debug, Clone)]
-pub struct WaveformView {
+pub(crate) struct WaveformView {
     duration: f64,
     pub start: f64,
     pub end: f64,
@@ -90,30 +90,27 @@ impl WaveformView {
         self.duration
     }
 
-    pub fn view_range(&self) -> (f64, f64) {
+    #[cfg(test)]
+    fn view_range(&self) -> (f64, f64) {
         (self.view_start, self.view_end)
     }
 
-    pub fn dragging(&self) -> Option<Marker> {
-        self.dragging
-    }
-
-    pub fn set_start(&mut self, seconds: f64) {
+    pub(crate) fn set_start(&mut self, seconds: f64) {
         let max = (self.end - MIN_SELECTION).max(0.0);
         self.start = seconds.clamp(0.0, max);
     }
 
-    pub fn set_end(&mut self, seconds: f64) {
+    pub(crate) fn set_end(&mut self, seconds: f64) {
         let min = (self.start + MIN_SELECTION).min(self.duration);
         self.end = seconds.clamp(min, self.duration);
     }
 
-    pub fn set_playhead(&mut self, seconds: f64) {
+    pub(crate) fn set_playhead(&mut self, seconds: f64) {
         self.playhead = seconds.clamp(0.0, self.duration);
     }
 
     /// Place la tête et fait défiler la vue si elle en sort.
-    pub fn follow_playhead(&mut self, seconds: f64) {
+    pub(crate) fn follow_playhead(&mut self, seconds: f64) {
         self.set_playhead(seconds);
         if self.playhead < self.view_start || self.playhead > self.view_end {
             let span = self.view_end - self.view_start;
@@ -123,7 +120,7 @@ impl WaveformView {
     }
 
     /// Zoome autour de `anchor` : le point sous la souris reste immobile.
-    pub fn zoom(&mut self, anchor: f64, factor: f64) {
+    pub(crate) fn zoom(&mut self, anchor: f64, factor: f64) {
         let span = self.view_end - self.view_start;
         let new_span = (span * factor).clamp(MIN_SPAN.min(self.duration), self.duration);
         let ratio = ((anchor - self.view_start) / span.max(1e-9)).clamp(0.0, 1.0);
@@ -132,14 +129,14 @@ impl WaveformView {
         self.view_end = new_start + new_span;
     }
 
-    pub fn pan(&mut self, delta_seconds: f64) {
+    pub(crate) fn pan(&mut self, delta_seconds: f64) {
         let span = self.view_end - self.view_start;
         self.view_start = (self.view_start + delta_seconds).clamp(0.0, self.duration - span);
         self.view_end = self.view_start + span;
     }
 
     /// Affiche `[from, to]` avec une petite marge de chaque côté.
-    pub fn zoom_to(&mut self, from: f64, to: f64) {
+    pub(crate) fn zoom_to(&mut self, from: f64, to: f64) {
         let margin = (to - from) * 0.05;
         let span = (to - from + 2.0 * margin).clamp(MIN_SPAN.min(self.duration), self.duration);
         let center = (from + to) / 2.0;
@@ -147,7 +144,7 @@ impl WaveformView {
         self.view_end = self.view_start + span;
     }
 
-    pub fn reset_zoom(&mut self) {
+    pub(crate) fn reset_zoom(&mut self) {
         self.view_start = 0.0;
         self.view_end = self.duration;
     }
@@ -202,7 +199,7 @@ impl WaveformView {
     }
 
     /// Dessine la vue et traite la souris. Renvoie les déplacements effectués.
-    pub fn show(&mut self, ui: &mut Ui, peaks: Option<&Peaks>, placeholder: Option<&str>) -> Vec<WaveEvent> {
+    pub(crate) fn show(&mut self, ui: &mut Ui, peaks: Option<&Peaks>, placeholder: Option<&str>) -> Vec<WaveEvent> {
         let (rect, response) = ui.allocate_exact_size(ui.available_size(), Sense::click_and_drag());
         let mut events = Vec::new();
         if placeholder.is_none() {
@@ -433,7 +430,7 @@ impl WaveformView {
 }
 
 /// Plus grand rectangle centré dans `container` qui respecte le ratio d'image.
-pub fn fit_rect(container: Rect, width: f32, height: f32) -> Rect {
+pub(crate) fn fit_rect(container: Rect, width: f32, height: f32) -> Rect {
     if width <= 0.0 || height <= 0.0 {
         return container;
     }

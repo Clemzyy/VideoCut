@@ -6,7 +6,7 @@ use std::time::Duration;
 use std::{fs, io, thread};
 
 /// Renomme (et remplace la destination), en réessayant pendant ~2 s.
-pub fn rename_with_retry(from: &Path, to: &Path) -> io::Result<()> {
+pub(crate) fn rename_with_retry(from: &Path, to: &Path) -> io::Result<()> {
     let mut attempt = 0;
     loop {
         match fs::rename(from, to) {

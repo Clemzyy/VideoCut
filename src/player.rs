@@ -17,7 +17,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 /// Taille maximale des images d'aperçu (au-delà, FFmpeg réduit l'image).
-pub const PREVIEW_MAX: (u32, u32) = (1280, 720);
+pub(crate) const PREVIEW_MAX: (u32, u32) = (1280, 720);
 const MAX_PREVIEW_FPS: f64 = 60.0;
 const GRAB_TIMEOUT: Duration = Duration::from_secs(20);
 
@@ -32,7 +32,7 @@ impl Volume {
         volume
     }
 
-    pub fn set_percent(&self, percent: u32) {
+    pub(crate) fn set_percent(&self, percent: u32) {
         let gain = percent.min(200) as f32 / 100.0;
         self.0.store(gain.to_bits(), Ordering::Relaxed);
     }
@@ -43,20 +43,20 @@ impl Volume {
 }
 
 /// Dimensions paires qui tiennent dans `max` sans agrandir la source.
-pub fn preview_size(source: (u32, u32), max: (u32, u32)) -> (u32, u32) {
+pub(crate) fn preview_size(source: (u32, u32), max: (u32, u32)) -> (u32, u32) {
     let (sw, sh) = (f64::from(source.0.max(2)), f64::from(source.1.max(2)));
     let scale = (f64::from(max.0) / sw).min(f64::from(max.1) / sh).min(1.0);
     let even = |value: f64| ((value * scale / 2.0).round() as u32 * 2).max(2);
     (even(sw), even(sh))
 }
 
-pub struct VideoFrame {
+pub(crate) struct VideoFrame {
     pub pts: f64,
     pub image: ColorImage,
 }
 
 /// File d'images : ne rend que l'image la plus récente dont l'heure est venue.
-pub struct FrameQueue {
+pub(crate) struct FrameQueue {
     rx: Receiver<VideoFrame>,
     pending: Option<VideoFrame>,
     finished: bool,
@@ -67,7 +67,7 @@ impl FrameQueue {
         Self { rx, pending: None, finished: false }
     }
 
-    pub fn take_due(&mut self, position: f64) -> Option<ColorImage> {
+    pub(crate) fn take_due(&mut self, position: f64) -> Option<ColorImage> {
         let mut newest = None;
         loop {
             if self.pending.is_none() {
@@ -90,7 +90,7 @@ impl FrameQueue {
         newest
     }
 
-    pub fn has_frame_ready(&mut self) -> bool {
+    pub(crate) fn has_frame_ready(&mut self) -> bool {
         if self.pending.is_none() {
             if let Ok(frame) = self.rx.try_recv() {
                 self.pending = Some(frame);
@@ -212,7 +212,7 @@ impl Playback {
         self.error.lock().ok()?.take()
     }
 
-    pub fn take_warning(&mut self) -> Option<String> {
+    pub(crate) fn take_warning(&mut self) -> Option<String> {
         self.warning.take()
     }
 }

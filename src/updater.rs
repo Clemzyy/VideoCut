@@ -21,15 +21,15 @@ use std::sync::mpsc::{Receiver, TryRecvError, channel};
 use std::thread;
 use std::time::Duration;
 
-pub const FFMPEG_RELEASE_API: &str = "https://api.github.com/repos/GyanD/codexffmpeg/releases/latest";
-pub const APP_RELEASE_API: &str = "https://api.github.com/repos/Clemzyy/VideoCut/releases/latest";
-pub const APP_RELEASES_PAGE: &str = "https://github.com/Clemzyy/VideoCut/releases/latest";
+pub(crate) const FFMPEG_RELEASE_API: &str = "https://api.github.com/repos/GyanD/codexffmpeg/releases/latest";
+pub(crate) const APP_RELEASE_API: &str = "https://api.github.com/repos/Clemzyy/VideoCut/releases/latest";
+pub(crate) const APP_RELEASES_PAGE: &str = "https://github.com/Clemzyy/VideoCut/releases/latest";
 const ASSET_SUFFIX: &str = "-essentials_build.zip";
 /// Taille maximale d'un fichier extrait (ffmpeg.exe pèse ~100 Mo).
 const MAX_EXTRACTED_BYTES: u64 = 1024 * 1024 * 1024;
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct Release {
+pub(crate) struct Release {
     pub tag_name: String,
     #[serde(default)]
     pub html_url: String,
@@ -38,7 +38,7 @@ pub struct Release {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct Asset {
+pub(crate) struct Asset {
     pub name: String,
     pub browser_download_url: String,
     #[serde(default)]
@@ -189,7 +189,7 @@ fn network_error(what: &str, err: &ureq::Error) -> String {
 }
 
 /// N'accepte que des numéros de version sûrs pour un nom de dossier.
-pub fn sanitize_tag(tag: &str) -> Option<String> {
+pub(crate) fn sanitize_tag(tag: &str) -> Option<String> {
     let tag = tag.trim().trim_start_matches(['v', 'V']);
     let valid = !tag.is_empty()
         && tag.len() <= 40
@@ -199,7 +199,7 @@ pub fn sanitize_tag(tag: &str) -> Option<String> {
     valid.then(|| tag.to_string())
 }
 
-pub fn pick_asset(release: &Release) -> Option<&Asset> {
+pub(crate) fn pick_asset(release: &Release) -> Option<&Asset> {
     release.assets.iter().find(|asset| asset.name.ends_with(ASSET_SUFFIX))
 }
 
@@ -312,7 +312,7 @@ fn verify_ffmpeg(ffmpeg: &Path) -> Result<(), String> {
 /// Supprime les anciennes versions et les restes de téléchargement.
 /// Les fichiers temporaires récents sont épargnés : une autre fenêtre de
 /// VideoCut est peut-être en train de les utiliser.
-pub fn remove_old_versions(data_dir: &Path, keep: &str) {
+pub(crate) fn remove_old_versions(data_dir: &Path, keep: &str) {
     const IN_PROGRESS_GRACE: Duration = Duration::from_secs(3600);
     let Ok(entries) = fs::read_dir(managed_root(data_dir)) else { return };
     for entry in entries.flatten() {
@@ -349,7 +349,7 @@ fn check_app_update() -> Result<Option<(String, String)>, String> {
 }
 
 /// Compare des versions numériques `1.2.10` > `1.2.9`.
-pub fn is_newer(candidate: &str, current: &str) -> bool {
+pub(crate) fn is_newer(candidate: &str, current: &str) -> bool {
     fn parse(version: &str) -> Vec<u64> {
         version
             .split(['.', '-'])

@@ -9,7 +9,7 @@ use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 /// Protocoles autorisés en entrée : jamais de réseau ni de playlist distante.
-pub const PROTOCOL_WHITELIST: &str = "file,pipe";
+pub(crate) const PROTOCOL_WHITELIST: &str = "file,pipe";
 
 /// Taille maximale conservée de stderr pour les messages d'erreur.
 const STDERR_TAIL_BYTES: usize = 8 * 1024;
@@ -29,14 +29,14 @@ pub fn command(program: &Path) -> Command {
 
 /// Préfixe `file:` : FFmpeg n'interprète alors jamais le chemin comme une
 /// option, un protocole (`concat:`, `http:`…) ou un motif.
-pub fn file_arg(path: &Path) -> OsString {
+pub(crate) fn file_arg(path: &Path) -> OsString {
     let mut arg = OsString::from("file:");
     arg.push(path.as_os_str());
     arg
 }
 
 /// Arguments communs à toutes les lectures d'un fichier média.
-pub fn input_args(path: &Path) -> Vec<OsString> {
+pub(crate) fn input_args(path: &Path) -> Vec<OsString> {
     vec!["-protocol_whitelist".into(), PROTOCOL_WHITELIST.into(), "-i".into(), file_arg(path)]
 }
 
@@ -89,7 +89,7 @@ mod job {
         .as_ref()
     }
 
-    pub fn assign(child: &Child) {
+    pub(crate) fn assign(child: &Child) {
         if let Some(job) = job() {
             // SAFETY: le handle du processus enfant est valide tant que `child` vit.
             unsafe {
@@ -100,19 +100,19 @@ mod job {
 }
 
 /// Processus enfant tué automatiquement quand il n'est plus utilisé.
-pub struct KillOnDrop(Option<Child>);
+pub(crate) struct KillOnDrop(Option<Child>);
 
 impl KillOnDrop {
     pub fn new(child: Child) -> Self {
         Self(Some(child))
     }
 
-    pub fn child_mut(&mut self) -> &mut Child {
+    pub(crate) fn child_mut(&mut self) -> &mut Child {
         self.0.as_mut().expect("processus déjà libéré")
     }
 
     /// Attend la fin normale du processus.
-    pub fn wait(mut self) -> std::io::Result<std::process::ExitStatus> {
+    pub(crate) fn wait(mut self) -> std::io::Result<std::process::ExitStatus> {
         let mut child = self.0.take().expect("processus déjà libéré");
         child.wait()
     }
@@ -130,7 +130,7 @@ impl Drop for KillOnDrop {
 }
 
 /// Vide un flux dans un thread et renvoie ses derniers octets en texte.
-pub fn drain_tail<R: Read + Send + 'static>(mut reader: R) -> JoinHandle<String> {
+pub(crate) fn drain_tail<R: Read + Send + 'static>(mut reader: R) -> JoinHandle<String> {
     thread::spawn(move || {
         let mut tail: Vec<u8> = Vec::new();
         let mut buf = [0u8; 4096];
@@ -159,7 +159,7 @@ pub fn run_with_timeout(cmd: Command, timeout: Duration) -> Result<Output, Strin
 
 /// Comme [`run_with_timeout`], mais le processus est aussi tué dès que
 /// `abort` renvoie `true` (demande devenue inutile).
-pub fn run_with_timeout_or_abort(
+pub(crate) fn run_with_timeout_or_abort(
     mut cmd: Command,
     timeout: Duration,
     abort: &dyn Fn() -> bool,
@@ -198,7 +198,7 @@ pub fn run_with_timeout_or_abort(
 }
 
 /// Résume un message d'erreur FFmpeg pour l'afficher à l'utilisateur.
-pub fn summarize_error(stderr: &str, fallback: &str) -> String {
+pub(crate) fn summarize_error(stderr: &str, fallback: &str) -> String {
     let lines: Vec<&str> = stderr.lines().filter(|l| !l.trim().is_empty()).collect();
     if lines.is_empty() {
         return fallback.to_string();

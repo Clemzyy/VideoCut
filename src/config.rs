@@ -39,7 +39,7 @@ impl Default for Config {
 }
 
 impl Config {
-    pub fn load(dir: &Path) -> Self {
+    pub(crate) fn load(dir: &Path) -> Self {
         fs::read_to_string(dir.join(CONFIG_FILE))
             .ok()
             .and_then(|text| serde_json::from_str(&text).ok())
@@ -47,7 +47,7 @@ impl Config {
     }
 
     /// Écriture atomique : fichier temporaire puis renommage.
-    pub fn save(&self, dir: &Path) -> Result<(), String> {
+    pub(crate) fn save(&self, dir: &Path) -> Result<(), String> {
         fs::create_dir_all(dir).map_err(|err| format!("Dossier {}: {err}", dir.display()))?;
         let text = serde_json::to_string_pretty(self).map_err(|err| err.to_string())?;
         let tmp = dir.join(format!("{CONFIG_FILE}.tmp"));
@@ -55,7 +55,7 @@ impl Config {
         crate::fsutil::rename_with_retry(&tmp, &dir.join(CONFIG_FILE)).map_err(|err| err.to_string())
     }
 
-    pub fn update_check_due(&self, now: u64) -> bool {
+    pub(crate) fn update_check_due(&self, now: u64) -> bool {
         const DAY: u64 = 24 * 60 * 60;
         now.saturating_sub(self.last_update_check) >= DAY
     }
@@ -72,7 +72,7 @@ pub fn data_dir() -> Option<PathBuf> {
     base.filter(|path| path.is_absolute()).map(|path| path.join("VideoCut"))
 }
 
-pub fn now_unix() -> u64 {
+pub(crate) fn now_unix() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
 }
 

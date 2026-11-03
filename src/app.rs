@@ -21,7 +21,7 @@ use std::thread;
 use std::time::Duration;
 
 pub const APP_TITLE: &str = "VideoCut by Clemzy";
-pub const REPOSITORY_URL: &str = "https://github.com/Clemzyy/VideoCut";
+pub(crate) const REPOSITORY_URL: &str = "https://github.com/Clemzyy/VideoCut";
 
 const BG: Color32 = Color32::from_rgb(0x15, 0x1a, 0x1f);
 const PANEL: Color32 = Color32::from_rgb(0x10, 0x14, 0x18);
@@ -936,10 +936,10 @@ impl VideoCutApp {
 
         ui.horizontal(|ui| {
             ui.add_enabled_ui(ready, |ui| {
-                let start_label = ui.label(RichText::new("Début").color(egui_start()));
+                let start_label = ui.label(RichText::new("Début").color(waveform::START_COLOR));
                 self.time_field(ui, Marker::Start, start_label.id);
                 ui.add_space(10.0);
-                let end_label = ui.label(RichText::new("Fin").color(egui_end()));
+                let end_label = ui.label(RichText::new("Fin").color(waveform::END_COLOR));
                 self.time_field(ui, Marker::End, end_label.id);
                 ui.add_space(10.0);
                 ui.label("Durée extrait");
@@ -1195,14 +1195,6 @@ impl Drop for VideoCutApp {
 
 fn bold(size: f32) -> FontId {
     FontId::new(size, FontFamily::Name("bold".into()))
-}
-
-fn egui_start() -> Color32 {
-    waveform::START_COLOR
-}
-
-fn egui_end() -> Color32 {
-    waveform::END_COLOR
 }
 
 /// Bouton icône ; si l'icône manque, un libellé texte le remplace.

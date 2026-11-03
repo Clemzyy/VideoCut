@@ -27,7 +27,7 @@ pub enum ExportMode {
 }
 
 /// Formats proposés dans la fenêtre d'enregistrement : (libellé, extension).
-pub const FORMATS: &[(&str, &str)] = &[
+pub(crate) const FORMATS: &[(&str, &str)] = &[
     ("Vidéo MP4", "mp4"),
     ("Vidéo MKV", "mkv"),
     ("Vidéo MOV", "mov"),
@@ -43,13 +43,13 @@ pub const FORMATS: &[(&str, &str)] = &[
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OutputKind {
+pub(crate) enum OutputKind {
     Video,
     Audio,
     Other,
 }
 
-pub fn output_kind(extension: &str) -> OutputKind {
+pub(crate) fn output_kind(extension: &str) -> OutputKind {
     match extension {
         "mp4" | "m4v" | "mkv" | "mov" | "webm" | "avi" => OutputKind::Video,
         "mp3" | "m4a" | "aac" | "wav" | "flac" | "ogg" | "opus" => OutputKind::Audio,
@@ -57,7 +57,7 @@ pub fn output_kind(extension: &str) -> OutputKind {
     }
 }
 
-pub fn extension_of(path: &Path) -> String {
+pub(crate) fn extension_of(path: &Path) -> String {
     path.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default()
 }
 
@@ -101,7 +101,7 @@ pub fn validate(job: &ExportJob) -> Result<(), String> {
 }
 
 /// Compare deux chemins comme le fait le système de fichiers.
-pub fn same_file(a: &Path, b: &Path) -> bool {
+pub(crate) fn same_file(a: &Path, b: &Path) -> bool {
     fn normalize(path: &Path) -> PathBuf {
         if let Ok(full) = path.canonicalize() {
             return full;
@@ -239,7 +239,7 @@ fn build_args(job: &ExportJob, temp: &Path, attempt: Attempt) -> Vec<OsString> {
 }
 
 /// Lit une ligne de `-progress` et renvoie le temps écoulé en secondes.
-pub fn parse_progress_line(line: &str) -> Option<f64> {
+pub(crate) fn parse_progress_line(line: &str) -> Option<f64> {
     let (key, value) = line.trim().split_once('=')?;
     match key {
         "out_time_us" | "out_time_ms" => value.parse::<i64>().ok().filter(|v| *v >= 0).map(|v| v as f64 / 1e6),
@@ -261,7 +261,7 @@ pub struct ExportHandle {
 
 impl ExportHandle {
     /// Avancement entre 0 et 1.
-    pub fn progress(&self) -> f32 {
+    pub(crate) fn progress(&self) -> f32 {
         self.progress.load(Ordering::Relaxed) as f32 / 1000.0
     }
 
