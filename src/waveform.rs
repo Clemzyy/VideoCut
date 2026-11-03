@@ -39,6 +39,17 @@ pub enum WaveEvent {
     DragStarted(Marker),
     Moved(Marker, f64),
     DragFinished(Marker),
+    /// Choix fait dans le menu du clic droit.
+    Menu(MenuAction),
+}
+
+/// Actions du menu contextuel ; l'heure est celle de l'endroit cliqué.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum MenuAction {
+    SetStart(f64),
+    SetEnd(f64),
+    PlayFrom(f64),
+    SelectAll,
 }
 
 #[derive(Debug, Clone)]
@@ -50,6 +61,8 @@ pub struct WaveformView {
     view_start: f64,
     view_end: f64,
     dragging: Option<Marker>,
+    /// Heure sous la souris au moment du clic droit.
+    menu_time: f64,
 }
 
 impl Default for WaveformView {
@@ -61,7 +74,16 @@ impl Default for WaveformView {
 impl WaveformView {
     pub fn new(duration: f64) -> Self {
         let duration = if duration.is_finite() { duration.max(0.001) } else { 0.001 };
-        Self { duration, start: 0.0, end: duration, playhead: 0.0, view_start: 0.0, view_end: duration, dragging: None }
+        Self {
+            duration,
+            start: 0.0,
+            end: duration,
+            playhead: 0.0,
+            view_start: 0.0,
+            view_end: duration,
+            dragging: None,
+            menu_time: 0.0,
+        }
     }
 
     pub fn duration(&self) -> f64 {
@@ -113,6 +135,15 @@ impl WaveformView {
     pub fn pan(&mut self, delta_seconds: f64) {
         let span = self.view_end - self.view_start;
         self.view_start = (self.view_start + delta_seconds).clamp(0.0, self.duration - span);
+        self.view_end = self.view_start + span;
+    }
+
+    /// Affiche `[from, to]` avec une petite marge de chaque côté.
+    pub fn zoom_to(&mut self, from: f64, to: f64) {
+        let margin = (to - from) * 0.05;
+        let span = (to - from + 2.0 * margin).clamp(MIN_SPAN.min(self.duration), self.duration);
+        let center = (from + to) / 2.0;
+        self.view_start = (center - span / 2.0).clamp(0.0, self.duration - span);
         self.view_end = self.view_start + span;
     }
 
@@ -176,13 +207,48 @@ impl WaveformView {
         let mut events = Vec::new();
         if placeholder.is_none() {
             self.handle_input(ui, rect, &response, &mut events);
+            self.context_menu(&response, &mut events);
         }
         let painter = ui.painter_at(rect);
         self.paint(&painter, rect, peaks, placeholder);
         events
     }
 
+    /// Menu du clic droit (un clic droit glissé sert toujours à se déplacer).
+    fn context_menu(&mut self, response: &Response, events: &mut Vec<WaveEvent>) {
+        let time = self.menu_time;
+        let (start, end) = (self.start, self.end);
+        response.context_menu(|ui| {
+            ui.label(egui::RichText::new(format_time(time)).monospace().weak());
+            ui.separator();
+            if ui.button("Placer le début ici\tI").clicked() {
+                events.push(WaveEvent::Menu(MenuAction::SetStart(time)));
+            }
+            if ui.button("Placer la fin ici\tO").clicked() {
+                events.push(WaveEvent::Menu(MenuAction::SetEnd(time)));
+            }
+            if ui.button("Lire depuis ici").clicked() {
+                events.push(WaveEvent::Menu(MenuAction::PlayFrom(time)));
+            }
+            ui.separator();
+            if ui.button("Zoomer sur la sélection").clicked() {
+                self.zoom_to(start, end);
+            }
+            if ui.button("Tout afficher\tdouble-clic").clicked() {
+                self.reset_zoom();
+            }
+            if ui.button("Sélectionner tout le fichier").clicked() {
+                events.push(WaveEvent::Menu(MenuAction::SelectAll));
+            }
+        });
+    }
+
     fn handle_input(&mut self, ui: &Ui, rect: Rect, response: &Response, events: &mut Vec<WaveEvent>) {
+        if response.hovered() && ui.input(|i| i.pointer.secondary_pressed()) {
+            if let Some(pos) = response.interact_pointer_pos().or(response.hover_pos()) {
+                self.menu_time = self.x_to_time(pos.x, rect);
+            }
+        }
         let (pressed, down, pos, delta, panning, shift, wheel) = ui.input(|i| {
             let wheel: Vec<(MouseWheelUnit, egui::Vec2)> = i
                 .events
@@ -406,6 +472,19 @@ mod tests {
             view.zoom(50.0, 1.0 / ZOOM_IN_STEP);
         }
         assert_eq!(view.view_range(), (0.0, 100.0));
+    }
+
+    #[test]
+    fn zoom_to_frames_the_selection_with_a_margin() {
+        let mut view = WaveformView::new(100.0);
+        view.zoom_to(40.0, 60.0);
+        assert_eq!(view.view_range(), (39.0, 61.0));
+        // Près des bords, la vue reste dans le fichier.
+        view.zoom_to(0.0, 10.0);
+        assert_eq!(view.view_range(), (0.0, 11.0));
+        // Sélection minuscule : on s'arrête au zoom maximal.
+        view.zoom_to(50.0, 50.001);
+        assert!((view.view_range().1 - view.view_range().0 - MIN_SPAN).abs() < 1e-9);
     }
 
     #[test]

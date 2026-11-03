@@ -8,7 +8,7 @@ use crate::player::{self, FrameGrabber, GrabRequest, Playback, PlaybackRequest, 
 use crate::timefmt::{format_time, parse_time};
 use crate::tools::{self, Tools};
 use crate::updater::{self, UpdateEvent, UpdateHandle, UpdateRequest};
-use crate::waveform::{self, Marker, WaveEvent, WaveformView};
+use crate::waveform::{self, Marker, MenuAction, WaveEvent, WaveformView};
 use egui::{
     Align, Align2, Color32, ColorImage, Context, CursorIcon, FontFamily, FontId, Frame, Id, Key, Layout, Margin,
     Modifiers, RichText, Sense, Stroke, StrokeKind, TextureHandle, TextureOptions, Ui, ViewportCommand, pos2, vec2,
@@ -451,6 +451,21 @@ impl VideoCutApp {
                         _ => self.view.playhead,
                     };
                     self.play_from(from, ctx);
+                }
+            }
+            WaveEvent::Menu(action) => {
+                self.playback = None;
+                match action {
+                    MenuAction::SetStart(time) => self.set_marker(Marker::Start, time),
+                    MenuAction::SetEnd(time) => self.set_marker(Marker::End, time),
+                    MenuAction::PlayFrom(time) => {
+                        let from = time.clamp(self.view.start, (self.view.end - 0.05).max(self.view.start));
+                        self.play_from(from, ctx);
+                    }
+                    MenuAction::SelectAll => {
+                        self.view.set_end(self.view.duration());
+                        self.set_marker(Marker::Start, 0.0);
+                    }
                 }
             }
         }
