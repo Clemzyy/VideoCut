@@ -27,6 +27,16 @@ pub fn command(program: &Path) -> Command {
     cmd
 }
 
+/// Options communes aux exécutions non interactives de FFmpeg.
+pub(crate) const QUIET_ARGS: [&str; 4] = ["-hide_banner", "-nostdin", "-loglevel", "error"];
+
+/// Commande FFmpeg silencieuse : sans bannière, sans stdin, erreurs seules.
+pub(crate) fn quiet_command(program: &Path) -> Command {
+    let mut cmd = command(program);
+    cmd.args(QUIET_ARGS);
+    cmd
+}
+
 /// Préfixe `file:` : FFmpeg n'interprète alors jamais le chemin comme une
 /// option, un protocole (`concat:`, `http:`…) ou un motif.
 pub(crate) fn file_arg(path: &Path) -> OsString {
@@ -47,6 +57,12 @@ pub fn spawn(cmd: &mut Command) -> std::io::Result<Child> {
     #[cfg(windows)]
     job::assign(&child);
     Ok(child)
+}
+
+/// Lance FFmpeg avec stdout et stderr en tubes, ou renvoie un message prêt à afficher.
+pub(crate) fn spawn_piped(cmd: &mut Command) -> Result<Child, String> {
+    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+    spawn(cmd).map_err(|err| format!("Impossible de lancer FFmpeg : {err}"))
 }
 
 #[cfg(windows)]
@@ -195,6 +211,14 @@ pub(crate) fn run_with_timeout_or_abort(
     let stdout = out_thread.join().unwrap_or_default();
     let stderr = err_thread.join().unwrap_or_default();
     Ok(Output { status, stdout, stderr: stderr.into_bytes() })
+}
+
+/// Vrai si `program -version` répond comme FFmpeg.
+pub(crate) fn runs_as_ffmpeg(program: &Path, timeout: Duration) -> Result<bool, String> {
+    let mut cmd = command(program);
+    cmd.arg("-version");
+    let output = run_with_timeout(cmd, timeout)?;
+    Ok(output.status.success() && String::from_utf8_lossy(&output.stdout).starts_with("ffmpeg version"))
 }
 
 /// Résume un message d'erreur FFmpeg pour l'afficher à l'utilisateur.

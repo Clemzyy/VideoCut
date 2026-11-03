@@ -9,7 +9,6 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use egui::ColorImage;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, SyncSender, TryRecvError, sync_channel};
 use std::sync::{Arc, Condvar, Mutex};
@@ -238,14 +237,12 @@ fn start_audio(
     let rate = supported.sample_rate();
     let decode_channels = usize::from(supported.channels()).clamp(1, 2);
 
-    let mut cmd = process::command(ffmpeg);
-    cmd.args(["-hide_banner", "-nostdin", "-loglevel", "error", "-ss", &format!("{from:.3}")])
+    let mut cmd = process::quiet_command(ffmpeg);
+    cmd.args(["-ss", &format!("{from:.3}")])
         .args(process::input_args(path))
         .args(["-t", &format!("{duration:.3}"), "-map", &format!("0:{audio_index}"), "-vn", "-sn", "-dn"])
-        .args(["-ac", &decode_channels.to_string(), "-ar", &rate.to_string(), "-f", "f32le", "pipe:1"])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    let mut child = process::spawn(&mut cmd).map_err(|err| format!("Impossible de lancer FFmpeg : {err}"))?;
+        .args(["-ac", &decode_channels.to_string(), "-ar", &rate.to_string(), "-f", "f32le", "pipe:1"]);
+    let mut child = process::spawn_piped(&mut cmd)?;
     let stdout = child.stdout.take().expect("stdout capturé");
     let stderr = process::drain_tail(child.stderr.take().expect("stderr capturé"));
     // Protégé tout de suite : si la carte son refuse le flux, FFmpeg est tué.
@@ -380,15 +377,13 @@ fn start_video(
 ) -> Result<(KillOnDrop, Receiver<VideoFrame>), String> {
     let fps = video.fps.unwrap_or(25.0).clamp(1.0, MAX_PREVIEW_FPS);
     let (width, height) = size;
-    let mut cmd = process::command(ffmpeg);
-    cmd.args(["-hide_banner", "-nostdin", "-loglevel", "error", "-ss", &format!("{from:.3}")])
+    let mut cmd = process::quiet_command(ffmpeg);
+    cmd.args(["-ss", &format!("{from:.3}")])
         .args(process::input_args(path))
         .args(["-t", &format!("{duration:.3}"), "-map", &format!("0:{}", video.index), "-an", "-sn", "-dn"])
         .args(["-vf", &format!("fps={fps:.4},scale={width}:{height}:flags=bilinear")])
-        .args(["-pix_fmt", "rgb24", "-f", "rawvideo", "pipe:1"])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    let mut child = process::spawn(&mut cmd).map_err(|err| format!("Impossible de lancer FFmpeg : {err}"))?;
+        .args(["-pix_fmt", "rgb24", "-f", "rawvideo", "pipe:1"]);
+    let mut child = process::spawn_piped(&mut cmd)?;
     let mut stdout = child.stdout.take().expect("stdout capturé");
     let stderr = process::drain_tail(child.stderr.take().expect("stderr capturé"));
     let (tx, rx) = sync_channel::<VideoFrame>(3);
@@ -518,9 +513,8 @@ fn grab_frame(request: &GrabRequest, stale: &dyn Fn() -> bool) -> Result<ColorIm
     let (width, height) = request.size;
     let frame_bytes = width as usize * height as usize * 3;
     let run = |seek: f64, window: Option<f64>| -> Result<(Vec<u8>, String), String> {
-        let mut cmd = process::command(&request.ffmpeg);
-        cmd.args(["-hide_banner", "-nostdin", "-loglevel", "error", "-ss", &format!("{seek:.3}")])
-            .args(process::input_args(&request.path));
+        let mut cmd = process::quiet_command(&request.ffmpeg);
+        cmd.args(["-ss", &format!("{seek:.3}")]).args(process::input_args(&request.path));
         // Fenêtre de repli : 10 images/s au plus, pour borner la mémoire.
         let filter = match window {
             Some(window) => {

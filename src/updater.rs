@@ -298,11 +298,7 @@ fn extract_tools(archive: &Path, destination: &Path) -> Result<(), String> {
 }
 
 fn verify_ffmpeg(ffmpeg: &Path) -> Result<(), String> {
-    let mut cmd = process::command(ffmpeg);
-    cmd.arg("-version");
-    let output = process::run_with_timeout(cmd, Duration::from_secs(20))?;
-    let text = String::from_utf8_lossy(&output.stdout);
-    if output.status.success() && text.starts_with("ffmpeg version") {
+    if process::runs_as_ffmpeg(ffmpeg, Duration::from_secs(20))? {
         Ok(())
     } else {
         Err("Le FFmpeg téléchargé ne démarre pas : installation annulée.".into())

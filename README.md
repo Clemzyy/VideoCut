@@ -27,6 +27,7 @@ Choisis un fichier, place le début et la fin sur la forme d'onde, écoute ou re
 | `Origine` | Revenir au début de la sélection |
 | `Ctrl+O` | Ouvrir un fichier |
 | `Ctrl+S` | Découper / convertir |
+| Clic droit | Menu : placer le début ou la fin ici, lire depuis ici, zoomer sur la sélection, tout afficher |
 | Molette | Zoom autour de la souris |
 | `Maj` + molette, clic droit glissé | Se déplacer dans la forme d'onde |
 | Double-clic | Voir tout le fichier |
@@ -84,7 +85,7 @@ cargo test --test updater_live -- --ignored
 
 | Module | Rôle |
 |---|---|
-| `app.rs` | Fenêtre et interactions (egui) |
+| `app/` | Fenêtre et interactions (egui) : chargement, lecture, export, mises à jour, panneaux d'interface |
 | `waveform.rs` | Forme d'onde, zoom, marqueurs |
 | `media.rs` | Analyse ffprobe et pyramide de pics |
 | `player.rs` | Lecture audio/vidéo et aperçu d'image |

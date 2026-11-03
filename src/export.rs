@@ -11,7 +11,6 @@ use std::ffi::OsString;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
-use std::process::Stdio;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::{Receiver, RecvTimeoutError, TryRecvError, channel};
@@ -184,8 +183,7 @@ fn build_args(job: &ExportJob, temp: &Path, attempt: Attempt) -> Vec<OsString> {
     let duration = job.end - job.start;
     let extension = extension_of(&job.output);
     let kind = output_kind(&extension);
-    let mut args: Vec<OsString> =
-        ["-hide_banner", "-nostdin", "-loglevel", "error", "-y", "-ss"].into_iter().map(OsString::from).collect();
+    let mut args: Vec<OsString> = process::QUIET_ARGS.into_iter().chain(["-y", "-ss"]).map(OsString::from).collect();
     args.push(format!("{:.3}", job.start).into());
     args.extend(process::input_args(&job.source));
     args.push("-t".into());
@@ -364,9 +362,8 @@ fn run_attempt(
     progress.store(0, Ordering::Relaxed);
     let duration = (job.end - job.start).max(0.001);
     let mut cmd = process::command(&job.ffmpeg);
-    cmd.args(build_args(job, temp, attempt)).stdout(Stdio::piped()).stderr(Stdio::piped());
-    let mut child =
-        process::spawn(&mut cmd).map_err(|err| AttemptError::Failed(format!("Impossible de lancer FFmpeg : {err}")))?;
+    cmd.args(build_args(job, temp, attempt));
+    let mut child = process::spawn_piped(&mut cmd).map_err(AttemptError::Failed)?;
     let stdout = child.stdout.take().expect("stdout capturé");
     let stderr = process::drain_tail(child.stderr.take().expect("stderr capturé"));
     let guard = KillOnDrop::new(child);

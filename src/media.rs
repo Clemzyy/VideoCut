@@ -6,7 +6,6 @@ use crate::tools::Tools;
 use serde::Deserialize;
 use std::io::Read;
 use std::path::Path;
-use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
@@ -49,9 +48,19 @@ impl MediaInfo {
 // ---------------------------------------------------------------------------
 
 pub fn probe(tools: &Tools, path: &Path) -> Result<MediaInfo, String> {
-    if let Some(ffprobe) = &tools.ffprobe {
-        let mut cmd = process::command(ffprobe);
-        cmd.args([
+    // Si ffprobe ne démarre même pas (fichier bloqué, supprimé…), on
+    // se rabat sur la bannière de ffmpeg plutôt que d'échouer.
+    if let Some(result) = tools.ffprobe.as_deref().and_then(|ffprobe| probe_with_ffprobe(ffprobe, path)) {
+        return result;
+    }
+    let ffmpeg = tools.ffmpeg.as_ref().ok_or("FFmpeg est introuvable.")?;
+    probe_with_ffmpeg(ffmpeg, path)
+}
+
+/// `None` si ffprobe n'a pas pu être exécuté.
+fn probe_with_ffprobe(ffprobe: &Path, path: &Path) -> Option<Result<MediaInfo, String>> {
+    let mut cmd = process::command(ffprobe);
+    cmd.args([
             "-v",
             "error",
             "-show_entries",
@@ -60,18 +69,16 @@ pub fn probe(tools: &Tools, path: &Path) -> Result<MediaInfo, String> {
             "json",
         ])
         .args(process::input_args(path));
-        // Si ffprobe ne démarre même pas (fichier bloqué, supprimé…), on
-        // se rabat sur la bannière de ffmpeg plutôt que d'échouer.
-        if let Ok(output) = process::run_with_timeout(cmd, PROBE_TIMEOUT) {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            if output.status.success() {
-                return parse_ffprobe_json(&stdout);
-            }
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(process::summarize_error(&stderr, "ffprobe n'a pas pu lire ce fichier."));
-        }
-    }
-    let ffmpeg = tools.ffmpeg.as_ref().ok_or("FFmpeg est introuvable.")?;
+    let output = process::run_with_timeout(cmd, PROBE_TIMEOUT).ok()?;
+    Some(if output.status.success() {
+        parse_ffprobe_json(&String::from_utf8_lossy(&output.stdout))
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(process::summarize_error(&stderr, "ffprobe n'a pas pu lire ce fichier."))
+    })
+}
+
+fn probe_with_ffmpeg(ffmpeg: &Path, path: &Path) -> Result<MediaInfo, String> {
     let mut cmd = process::command(ffmpeg);
     cmd.arg("-hide_banner").args(process::input_args(path));
     let output = process::run_with_timeout(cmd, PROBE_TIMEOUT)?;
@@ -352,14 +359,11 @@ pub fn extract_peaks(
     mut progress: impl FnMut(f32),
 ) -> Result<Peaks, String> {
     let ffmpeg = tools.ffmpeg.as_ref().ok_or("FFmpeg est introuvable.")?;
-    let mut cmd = process::command(ffmpeg);
-    cmd.args(["-hide_banner", "-nostdin", "-loglevel", "error"])
-        .args(process::input_args(path))
+    let mut cmd = process::quiet_command(ffmpeg);
+    cmd.args(process::input_args(path))
         .args(["-map", &format!("0:{audio_index}"), "-vn", "-sn", "-dn", "-ac", "1"])
-        .args(["-ar", &ANALYSIS_RATE.to_string(), "-f", "s16le", "pipe:1"])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    let mut child = process::spawn(&mut cmd).map_err(|err| format!("Impossible de lancer FFmpeg : {err}"))?;
+        .args(["-ar", &ANALYSIS_RATE.to_string(), "-f", "s16le", "pipe:1"]);
+    let mut child = process::spawn_piped(&mut cmd)?;
     let stderr = process::drain_tail(child.stderr.take().expect("stderr capturé"));
     let mut stdout = child.stdout.take().expect("stdout capturé");
     let guard = KillOnDrop::new(child);
