@@ -27,7 +27,8 @@ use std::sync::mpsc::Receiver;
 use std::thread;
 use std::time::Duration;
 
-pub const APP_TITLE: &str = "VideoCut by Clemzy";
+/// Titre de la fenêtre, comme StreamDL : nom et version (tirée de Cargo.toml).
+pub const APP_TITLE: &str = concat!("VideoCut v", env!("CARGO_PKG_VERSION"));
 pub(crate) const REPOSITORY_URL: &str = "https://github.com/Clemzyy/VideoCut";
 
 struct LoadedMedia {
